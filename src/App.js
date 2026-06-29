@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
+import CharacterCreation from './CharacterCreation'
+import Settings from './Settings'
 
 const menuItems = [
-  { id: 'dungeon',      label: 'Donjon',      icon: '⚔️' },
+  { id: 'dungeon',     label: 'Donjon',      icon: '⚔️' },
+  { id: 'profile',     label: 'Personnage',  icon: '👤' },
   { id: 'inventory',   label: 'Inventaire',  icon: '🎒' },
   { id: 'alchemy',     label: 'Alchimie',    icon: '⚗️' },
   { id: 'market',      label: 'Marché',      icon: '🏪' },
   { id: 'leaderboard', label: 'Leaderboard', icon: '🏆' },
-  { id: 'profile',     label: 'Personnage',  icon: '👤' },
 ]
 
 function App() {
   const [session, setSession] = useState(null)
   const [activeTab, setActiveTab] = useState(null)
   const [player, setPlayer] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -30,7 +33,7 @@ function App() {
     const { data } = await supabase
       .from('players')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('user_id', session.user.id)
       .single()
     if (data) setPlayer(data)
   }
@@ -46,6 +49,13 @@ function App() {
         Se connecter avec Discord
       </button>
     </div>
+  )
+
+  if (session && player === null) return (
+    <CharacterCreation session={session} onCreated={fetchPlayer} />
+  )
+  if (showSettings) return (
+  <Settings onBack={() => setShowSettings(false)} />
   )
 
   if (activeTab) return (
@@ -68,7 +78,9 @@ function App() {
           <div style={styles.gameTitle}>Isoneiros</div>
           <div style={styles.playerName}>👤 {player?.username || 'Aventurier'}</div>
         </div>
-        <button style={styles.settingsBtn}>⚙️</button>
+        <button style={styles.settingsBtn} onClick={() => setShowSettings(true)}>
+          ⚙️
+        </button>
       </div>
 
       <div style={styles.grid}>
