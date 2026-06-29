@@ -24,7 +24,7 @@ function App() {
           <p>Connecte-toi pour jouer</p>
           <button onClick={() => supabase.auth.signInWithOAuth({
             provider: 'discord',
-            options: { redirectTo: 'http://localhost:3000' }
+            options: { redirectTo: window.location.origin }
           })}>
             Se connecter avec Discord
           </button>
