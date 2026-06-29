@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import CharacterCreation from './CharacterCreation'
 import Settings from './Settings'
+import Profile from './Profile'
 
 const menuItems = [
   { id: 'dungeon',     label: 'Donjon',      icon: '⚔️' },
@@ -66,7 +67,8 @@ function App() {
         <span />
       </div>
       <div style={styles.content}>
-        <p style={styles.comingSoon}>Bientôt disponible...</p>
+        {activeTab === 'profile' && <Profile player={player} onBack={() => setActiveTab(null)} />}
+        {activeTab !== 'profile' && <p style={styles.comingSoon}>Bientôt disponible...</p>}
       </div>
     </div>
   )
