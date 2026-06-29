@@ -23,6 +23,7 @@ function App() {
 
   useEffect(() => {
     if (session) fetchPlayer()
+  // eslint-disable-next-line
   }, [session])
 
   async function fetchPlayer() {
