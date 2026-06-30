@@ -96,8 +96,8 @@ function setSpeed(value) {
       <div style={styles.controls}>
         <div style={styles.speedBtns}>
           <button style={{ ...styles.speedBtn, ...(speedDisplay === 1000 ? styles.speedBtnActive : {}) }} onClick={() => setSpeed(1000)}>🐢 Lent</button>
-          <button style={{ ...styles.speedBtn, ...(speedDisplay === 600 ? styles.speedBtnActive : {}) }} onClick={() => setSpeed(600)}>🚶 Normal</button>
-          <button style={{ ...styles.speedBtn, ...(speedDisplay === 200 ? styles.speedBtnActive : {}) }} onClick={() => setSpeed(200)}>⚡ Rapide</button>
+          <button style={{ ...styles.speedBtn, ...(speedDisplay === 500 ? styles.speedBtnActive : {}) }} onClick={() => setSpeed(500)}>🚶 Normal</button>
+          <button style={{ ...styles.speedBtn, ...(speedDisplay === 100 ? styles.speedBtnActive : {}) }} onClick={() => setSpeed(100)}>⚡ Rapide</button>
         </div>
         {!finished && (
           <button style={styles.forfeitBtn} onClick={() => onResult({ victory: false, monster, playerHpLeft: 0, forfeit: true })}>

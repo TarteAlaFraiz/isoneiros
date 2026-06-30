@@ -3,7 +3,22 @@ import { supabase } from './supabase'
 import Combat from './Combat'
 
 const ROW_SIZES = [2, 3, 4, 3, 4, 3, 2]
-const roomTypes = ['combat', 'buff', 'heal', 'random']
+const roomWeights = [
+  { type: 'combat', weight: 50 },
+  { type: 'buff', weight: 15 },
+  { type: 'heal', weight: 10 },
+  { type: 'random', weight: 25 },
+]
+
+function pickRoomType() {
+  const total = roomWeights.reduce((sum, r) => sum + r.weight, 0)
+  let rand = Math.random() * total
+  for (const r of roomWeights) {
+    if (rand < r.weight) return r.type
+    rand -= r.weight
+  }
+  return roomWeights[0].type
+}
 
 function getAccessibleRooms(rowIndex, roomIndex, floorMap) {
   if (rowIndex < 0) return []
@@ -27,7 +42,7 @@ function Dungeon({ player, onBack }) {
   const [floorNumber] = useState(1)
   const [floorMap] = useState(() => {
     const rows = ROW_SIZES.map(size => Array.from({ length: size }, () => ({
-      type: roomTypes[Math.floor(Math.random() * roomTypes.length)],
+      type: pickRoomType(),
       cleared: false,
     })))
     rows.push([{ type: 'boss', cleared: false }])
@@ -111,10 +126,55 @@ function Dungeon({ player, onBack }) {
     setCurrentRoomIndex(roomIndex)
   }
 
-  function handleCombatResult(result) {
+  async function handleCombatResult(result) {
     setInCombat(false)
     setCurrentMonsterId(null)
+    if (result.victory) {
+      await handleCombatVictory(result.monster)
+    }
     setTimeout(() => computeLines(), 100)
+  }
+
+async function handleCombatVictory(monster) {
+    const { data: lootTable } = await supabase
+      .from('monster_loot')
+      .select('*')
+      .eq('monster_id', monster.id)
+
+    console.log('monster.id:', monster.id, 'lootTable:', lootTable)
+
+    if (!lootTable) return
+
+    const lootBonus = player.class === 'alchimiste' ? 1.2 : 1
+
+    for (const loot of lootTable) {
+      const roll = Math.random()
+      const effectiveDropRate = Math.min(loot.drop_rate * lootBonus, 1)
+      console.log(`Tentative loot ${loot.item_name}: roll=${roll}, dropRate=${effectiveDropRate}`)
+      if (roll <= effectiveDropRate) {
+        await addItemToInventory(loot.item_name, loot.item_category)
+      }
+    }
+  }
+
+  async function addItemToInventory(itemName, itemCategory) {
+    const { data: existingItems } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('user_id', player.user_id)
+      .eq('item_name', itemName)
+
+    if (existingItems && existingItems.length > 0) {
+      const existing = existingItems[0]
+      await supabase
+        .from('inventory')
+        .update({ quantity: existing.quantity + 1 })
+        .eq('id', existing.id)
+    } else {
+      await supabase
+        .from('inventory')
+        .insert({ user_id: player.user_id, item_name: itemName, item_category: itemCategory, quantity: 1 })
+    }
   }
 
   if (inCombat && currentMonsterId) {
