@@ -365,6 +365,17 @@ function Dungeon({ player, onBack }) {
           })}
         </div>
       </div>
+
+      <div style={styles.lootSidebar}>
+        <h3 style={styles.lootSidebarTitle}>🎒 Butin</h3>
+        {Object.keys(runLoot).length === 0 ? (
+          <p style={styles.lootSidebarEmpty}>Rien pour l'instant...</p>
+        ) : (
+          Object.entries(runLoot).map(([name, info]) => (
+            <p key={name} style={styles.lootSidebarLine}>{name} x{info.quantity}</p>
+          ))
+        )}
+      </div>
     </div>
   )
 }
@@ -391,6 +402,10 @@ const styles = {
   comingSoon: { color: '#555', fontStyle: 'italic' },
   exitBtn: { background: '#1a1a2e', border: '1px solid #c9a84c', color: '#c9a84c', borderRadius: '8px', padding: '12px 24px', fontSize: '1rem', cursor: 'pointer', marginBottom: '12px', width: '100%', maxWidth: '400px' },
   continueBtn: { background: '#c9a84c', border: 'none', color: '#0d0d1a', borderRadius: '8px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', maxWidth: '400px' },
+  lootSidebar: { position: 'fixed', top: '80px', right: '20px', background: '#111122', border: '1px solid #2a2a4a', borderRadius: '12px', padding: '16px', width: '180px', maxHeight: '60vh', overflowY: 'auto' },
+  lootSidebarTitle: { color: '#c9a84c', fontFamily: 'Georgia, serif', fontSize: '1rem', marginTop: 0, marginBottom: '10px' },
+  lootSidebarLine: { fontSize: '0.8rem', color: '#ccc', margin: '4px 0' },
+  lootSidebarEmpty: { fontSize: '0.8rem', color: '#555', fontStyle: 'italic' },
 }
 
 export default Dungeon
