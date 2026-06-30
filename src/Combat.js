@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 
-const classBonus = {
-  guerrier: { damageReduction: 0.2 },
-  voleur: { damageMultiplier: 1.5 },
-  alchimiste: { lootBonus: 0.2 },
-}
-
 function Combat({ player, monsterId, onResult }) {
-  console.log('Combat monté avec player.currentHp:', player.currentHp, 'player.pv:', player.pv)
   const [monster, setMonster] = useState(null)
   const [log, setLog] = useState([])
   const [playerHp, setPlayerHp] = useState(player.currentHp ?? player.pv)
@@ -18,10 +11,10 @@ function Combat({ player, monsterId, onResult }) {
   const speedRef = useRef(1000)
   const [speedDisplay, setSpeedDisplay] = useState(1000)
 
-function setSpeed(value) {
-  speedRef.current = value
-  setSpeedDisplay(value)
-}
+  function setSpeed(value) {
+    speedRef.current = value
+    setSpeedDisplay(value)
+  }
 
   useEffect(() => {
     fetchMonster()
@@ -72,15 +65,19 @@ function setSpeed(value) {
 
       if (turn === 'player') {
         const dmg = Math.max(1, getPlayerDamage() - monster.resistance)
+        // eslint-disable-next-line no-loop-func
         mHp = Math.max(0, mHp - dmg)
         setMonsterHp(mHp)
+        // eslint-disable-next-line no-loop-func
         setLog(prev => [...prev, `⚔️ ${player.username} inflige ${dmg} dégâts à ${monster.name} (${mHp} PV restants)`])
         turn = 'monster'
       } else {
         const rawDmg = Math.max(1, monster.force - (player.resistance || 0))
         const dmg = getDamageToPlayer(rawDmg)
+        // eslint-disable-next-line no-loop-func
         pHp = Math.max(0, pHp - dmg)
         setPlayerHp(pHp)
+        // eslint-disable-next-line no-loop-func
         setLog(prev => [...prev, `💢 ${monster.name} inflige ${dmg} dégâts à ${player.username} (${pHp} PV restants)`])
         turn = 'player'
       }
@@ -157,11 +154,11 @@ const styles = {
   logLine: { fontSize: '0.85rem', color: '#aaa', margin: '4px 0' },
   result: { fontSize: '1.4rem', color: '#c9a84c', fontFamily: 'Georgia, serif', marginTop: '20px' },
   continueBtn: { background: '#c9a84c', color: '#0d0d1a', border: 'none', borderRadius: '8px', padding: '12px 32px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '16px' },
-controls: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '16px' },
-speedBtns: { display: 'flex', gap: '8px' },
-speedBtn: { background: '#111122', border: '1px solid #2a2a4a', color: '#888', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', cursor: 'pointer' },
-speedBtnActive: { border: '1px solid #c9a84c', color: '#c9a84c' },
-forfeitBtn: { background: 'none', border: '1px solid #5a2a2a', color: '#e05555', borderRadius: '8px', padding: '6px 16px', fontSize: '0.85rem', cursor: 'pointer' },
+  controls: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '16px' },
+  speedBtns: { display: 'flex', gap: '8px' },
+  speedBtn: { background: '#111122', border: '1px solid #2a2a4a', color: '#888', borderRadius: '8px', padding: '6px 12px', fontSize: '0.8rem', cursor: 'pointer' },
+  speedBtnActive: { border: '1px solid #c9a84c', color: '#c9a84c' },
+  forfeitBtn: { background: 'none', border: '1px solid #5a2a2a', color: '#e05555', borderRadius: '8px', padding: '6px 16px', fontSize: '0.85rem', cursor: 'pointer' },
 }
 
 export default Combat
