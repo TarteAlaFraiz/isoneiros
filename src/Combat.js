@@ -8,14 +8,15 @@ const classBonus = {
 }
 
 function Combat({ player, monsterId, onResult }) {
+  console.log('Combat monté avec player.currentHp:', player.currentHp, 'player.pv:', player.pv)
   const [monster, setMonster] = useState(null)
   const [log, setLog] = useState([])
-  const [playerHp, setPlayerHp] = useState(player.pv)
+  const [playerHp, setPlayerHp] = useState(player.currentHp ?? player.pv)
   const [monsterHp, setMonsterHp] = useState(null)
   const [finished, setFinished] = useState(false)
   const started = useRef(false)
   const speedRef = useRef(1000)
-const [speedDisplay, setSpeedDisplay] = useState(1000)
+  const [speedDisplay, setSpeedDisplay] = useState(1000)
 
 function setSpeed(value) {
   speedRef.current = value
@@ -58,7 +59,7 @@ function setSpeed(value) {
   }
 
   async function runCombat() {
-    let pHp = player.pv
+    let pHp = player.currentHp ?? player.pv
     let mHp = monster.pv
 
     const playerFirst = getPlayerInitiative() >= monster.agilite

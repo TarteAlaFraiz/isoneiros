@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { supabase } from './supabase'
 import Combat from './Combat'
+import { gameConfig } from './gameConfig'
 
 const ROW_SIZES = [2, 3, 4, 3, 4, 3, 2]
 const roomWeights = [
@@ -36,24 +37,31 @@ function getAccessibleRooms(rowIndex, roomIndex, floorMap) {
   return accessible
 }
 
+function generateFloorMap() {
+  const rows = ROW_SIZES.map(size => Array.from({ length: size }, () => ({
+    type: pickRoomType(),
+    cleared: false,
+  })))
+  rows.push([{ type: 'boss', cleared: false }])
+  return rows
+}
+
 const roomIcons = { combat: '⚔️', buff: '✨', heal: '❤️', random: '❓', boss: '👑' }
 
 function Dungeon({ player, onBack }) {
-  const [floorNumber] = useState(1)
-  const [floorMap] = useState(() => {
-    const rows = ROW_SIZES.map(size => Array.from({ length: size }, () => ({
-      type: pickRoomType(),
-      cleared: false,
-    })))
-    rows.push([{ type: 'boss', cleared: false }])
-    return rows
-  })
+  const [floorNumber, setFloorNumber] = useState(1)
+  const [floorMap, setFloorMap] = useState(generateFloorMap)
   const [currentRow, setCurrentRow] = useState(-1)
   const [currentRoomIndex, setCurrentRoomIndex] = useState(null)
   const [pathHistory, setPathHistory] = useState([])
   const [inCombat, setInCombat] = useState(false)
   const [currentMonsterId, setCurrentMonsterId] = useState(null)
+  const [pendingRoomTarget, setPendingRoomTarget] = useState(null)
+  const [combatCount, setCombatCount] = useState(0)
   const [lines, setLines] = useState([])
+  const [runLoot, setRunLoot] = useState({})
+  const [screen, setScreen] = useState('map')
+  const [currentHp, setCurrentHp] = useState(player.pv)
 
   const mapRef = useRef(null)
   const roomRefs = useRef({})
@@ -104,12 +112,13 @@ function Dungeon({ player, onBack }) {
     const room = floorMap[rowIndex][roomIndex]
 
     if (room.type === 'combat' || room.type === 'boss') {
+      setPendingRoomTarget({ rowIndex, roomIndex })
       const roomType = room.type === 'boss' ? 'boss' : 'combat'
       const { data } = await supabase
         .from('dungeon_floor_monsters')
         .select('monster_ids')
         .eq('dungeon_id', 'foret_sombre')
-        .eq('floor_number', floorNumber)
+        .eq('floor_number', 1)
         .eq('room_type', roomType)
         .single()
 
@@ -117,8 +126,14 @@ function Dungeon({ player, onBack }) {
         const ids = data.monster_ids.split(',').map(id => id.trim())
         const randomId = ids[Math.floor(Math.random() * ids.length)]
         setCurrentMonsterId(randomId)
+        setCombatCount(c => c + 1)
         setInCombat(true)
+        return
       }
+    }
+
+    if (room.type === 'heal') {
+      setCurrentHp(player.pv)
     }
 
     setCurrentRow(rowIndex)
@@ -129,56 +144,169 @@ function Dungeon({ player, onBack }) {
   async function handleCombatResult(result) {
     setInCombat(false)
     setCurrentMonsterId(null)
+    setCurrentHp(result.playerHpLeft)
+
     if (result.victory) {
       await handleCombatVictory(result.monster)
+      const targetRow = pendingRoomTarget.rowIndex
+      const targetRoomIdx = pendingRoomTarget.roomIndex
+      const isBoss = floorMap[targetRow][targetRoomIdx]?.type === 'boss'
+
+      setCurrentRow(targetRow)
+      setPathHistory(prev => [...prev, { rowIndex: targetRow, roomIndex: targetRoomIdx }])
+      setCurrentRoomIndex(targetRoomIdx)
+      setPendingRoomTarget(null)
+
+      if (isBoss || targetRow === floorMap.length - 1) {
+        setTimeout(() => setScreen('floorClear'), 300)
+      } else {
+        setTimeout(() => computeLines(), 100)
+      }
+    } else {
+      setTimeout(() => setScreen('death'), 300)
     }
-    setTimeout(() => computeLines(), 100)
   }
 
-async function handleCombatVictory(monster) {
+  async function handleCombatVictory(monster) {
     const { data: lootTable } = await supabase
       .from('monster_loot')
       .select('*')
       .eq('monster_id', monster.id)
 
-    console.log('monster.id:', monster.id, 'lootTable:', lootTable)
-
     if (!lootTable) return
 
     const lootBonus = player.class === 'alchimiste' ? 1.2 : 1
+    const newLoot = { ...runLoot }
 
     for (const loot of lootTable) {
       const roll = Math.random()
       const effectiveDropRate = Math.min(loot.drop_rate * lootBonus, 1)
-      console.log(`Tentative loot ${loot.item_name}: roll=${roll}, dropRate=${effectiveDropRate}`)
       if (roll <= effectiveDropRate) {
-        await addItemToInventory(loot.item_name, loot.item_category)
+        if (newLoot[loot.item_name]) {
+          newLoot[loot.item_name].quantity += 1
+        } else {
+          newLoot[loot.item_name] = { quantity: 1, category: loot.item_category }
+        }
+      }
+    }
+
+    setRunLoot(newLoot)
+  }
+
+  async function commitLootToInventory(lootObj) {
+    for (const [itemName, info] of Object.entries(lootObj)) {
+      const { data: existingItems } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('user_id', player.user_id)
+        .eq('item_name', itemName)
+
+      if (existingItems && existingItems.length > 0) {
+        const existing = existingItems[0]
+        await supabase
+          .from('inventory')
+          .update({ quantity: existing.quantity + info.quantity })
+          .eq('id', existing.id)
+      } else {
+        await supabase
+          .from('inventory')
+          .insert({ user_id: player.user_id, item_name: itemName, item_category: info.category, quantity: info.quantity })
       }
     }
   }
 
-  async function addItemToInventory(itemName, itemCategory) {
-    const { data: existingItems } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('user_id', player.user_id)
-      .eq('item_name', itemName)
+  async function handleExitWithLoot() {
+    await commitLootToInventory(runLoot)
+    setScreen('exited')
+  }
 
-    if (existingItems && existingItems.length > 0) {
-      const existing = existingItems[0]
-      await supabase
-        .from('inventory')
-        .update({ quantity: existing.quantity + 1 })
-        .eq('id', existing.id)
-    } else {
-      await supabase
-        .from('inventory')
-        .insert({ user_id: player.user_id, item_name: itemName, item_category: itemCategory, quantity: 1 })
+  async function handleNextFloor() {
+    setFloorNumber(f => f + 1)
+    setFloorMap(generateFloorMap())
+    setCurrentRow(-1)
+    setCurrentRoomIndex(null)
+    setPathHistory([])
+    setCurrentHp(player.pv)
+    setScreen('map')
+  }
+
+  async function handleDeathConfirm() {
+    const keptLoot = {}
+    for (const [itemName, info] of Object.entries(runLoot)) {
+      const keptQuantity = Math.floor(info.quantity * (1 - gameConfig.dungeon.deathLootLossPercent))
+      if (keptQuantity > 0) {
+        keptLoot[itemName] = { quantity: keptQuantity, category: info.category }
+      }
     }
+    await commitLootToInventory(keptLoot)
+    setScreen('exited')
   }
 
   if (inCombat && currentMonsterId) {
-    return <Combat player={player} monsterId={currentMonsterId} onResult={handleCombatResult} />
+    return (
+      <Combat
+        key={combatCount}
+        player={{ ...player, currentHp }}
+        monsterId={currentMonsterId}
+        onResult={handleCombatResult}
+      />
+    )
+  }
+
+  if (screen === 'floorClear') {
+    return (
+      <div style={styles.page}>
+        <h2 style={styles.title}>🏆 Étage {floorNumber} terminé !</h2>
+        <div style={styles.lootBox}>
+          <h3 style={styles.lootTitle}>Butin accumulé</h3>
+          {Object.keys(runLoot).length === 0 ? (
+            <p style={styles.comingSoon}>Aucun loot pour l'instant...</p>
+          ) : (
+            Object.entries(runLoot).map(([name, info]) => (
+              <p key={name} style={styles.lootLine}>{name} x{info.quantity}</p>
+            ))
+          )}
+        </div>
+        <button style={styles.exitBtn} onClick={handleExitWithLoot}>🚪 Sortir avec le butin</button>
+        <button style={styles.continueBtn} onClick={handleNextFloor}>⬆️ Tenter l'étage {floorNumber + 1} (plus difficile)</button>
+      </div>
+    )
+  }
+
+  if (screen === 'death') {
+    const lostItems = Object.entries(runLoot).map(([name, info]) => {
+      const kept = Math.floor(info.quantity * (1 - gameConfig.dungeon.deathLootLossPercent))
+      const lost = info.quantity - kept
+      return { name, kept, lost }
+    })
+    return (
+      <div style={styles.page}>
+        <h2 style={styles.deathTitle}>💀 Tu es tombé...</h2>
+        <div style={styles.lootBox}>
+          <h3 style={styles.lootTitle}>Bilan du butin</h3>
+          {lostItems.length === 0 ? (
+            <p style={styles.comingSoon}>Tu n'avais rien à perdre...</p>
+          ) : (
+            lostItems.map(item => (
+              <p key={item.name} style={styles.lootLine}>
+                {item.name} — <span style={styles.kept}>gardé: {item.kept}</span> / <span style={styles.lost}>perdu: {item.lost}</span>
+              </p>
+            ))
+          )}
+        </div>
+        <button style={styles.exitBtn} onClick={handleDeathConfirm}>Quitter le donjon</button>
+      </div>
+    )
+  }
+
+  if (screen === 'exited') {
+    return (
+      <div style={styles.page}>
+        <h2 style={styles.title}>✅ Retour au village</h2>
+        <p style={styles.comingSoon}>Le butin a été ajouté à ton inventaire.</p>
+        <button style={styles.exitBtn} onClick={onBack}>Retour au menu</button>
+      </div>
+    )
   }
 
   return (
@@ -245,6 +373,7 @@ const styles = {
   page: { background: '#0d0d1a', minHeight: '100vh', color: '#e0d5c5', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   backBtn: { background: 'none', border: 'none', color: '#c9a84c', fontSize: '1rem', cursor: 'pointer', alignSelf: 'flex-start', marginBottom: '10px' },
   title: { color: '#c9a84c', fontFamily: 'Georgia, serif', fontSize: '1.4rem', marginBottom: '20px', textAlign: 'center' },
+  deathTitle: { color: '#e05555', fontFamily: 'Georgia, serif', fontSize: '1.6rem', marginBottom: '20px', textAlign: 'center' },
   mapWrapper: { position: 'relative', width: '100%', maxWidth: '400px' },
   linesSvg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' },
   map: { display: 'flex', flexDirection: 'column-reverse', gap: '20px', width: '100%', position: 'relative' },
@@ -254,6 +383,14 @@ const styles = {
   roomPast: { opacity: 0.6, cursor: 'default' },
   roomCleared: { border: '2px solid #4a9a5a' },
   roomCurrent: { border: '3px solid #4a9a5a', boxShadow: '0 0 16px rgba(74,154,90,0.6)' },
+  lootBox: { background: '#111122', border: '1px solid #2a2a4a', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '400px', marginBottom: '20px' },
+  lootTitle: { color: '#c9a84c', fontFamily: 'Georgia, serif', marginTop: 0 },
+  lootLine: { fontSize: '0.9rem', color: '#ccc', margin: '6px 0' },
+  kept: { color: '#4a9a5a' },
+  lost: { color: '#e05555' },
+  comingSoon: { color: '#555', fontStyle: 'italic' },
+  exitBtn: { background: '#1a1a2e', border: '1px solid #c9a84c', color: '#c9a84c', borderRadius: '8px', padding: '12px 24px', fontSize: '1rem', cursor: 'pointer', marginBottom: '12px', width: '100%', maxWidth: '400px' },
+  continueBtn: { background: '#c9a84c', border: 'none', color: '#0d0d1a', borderRadius: '8px', padding: '12px 24px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%', maxWidth: '400px' },
 }
 
 export default Dungeon
