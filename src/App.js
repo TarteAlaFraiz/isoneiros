@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import CharacterCreation from './CharacterCreation'
 import Settings from './Settings'
 import Profile from './Profile'
+import Dungeon from './Dungeon'
 
 const menuItems = [
   { id: 'dungeon',     label: 'Donjon',      icon: '⚔️' },
@@ -58,7 +59,9 @@ function App() {
   if (showSettings) return (
   <Settings onBack={() => setShowSettings(false)} />
   )
-
+  if (activeTab === 'dungeon') return (
+  <Dungeon player={player} onBack={() => setActiveTab(null)} />
+)
   if (activeTab) return (
     <div style={styles.app}>
       <div style={styles.topBar}>
@@ -67,8 +70,10 @@ function App() {
         <span />
       </div>
       <div style={styles.content}>
-        {activeTab === 'profile' && <Profile player={player} onBack={() => setActiveTab(null)} />}
-        {activeTab !== 'profile' && <p style={styles.comingSoon}>Bientôt disponible...</p>}
+        {activeTab === 'profile' ? 
+  <Profile player={player} onBack={() => setActiveTab(null)} /> : 
+  <p style={styles.comingSoon}>Bientôt disponible...</p>
+}
       </div>
     </div>
   )
