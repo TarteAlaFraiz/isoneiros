@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 
 function Combat({ player, monsterId, onResult }) {
   const [monster, setMonster] = useState(null)
+  const [weaponLines, setWeaponLines] = useState([])
   const [log, setLog] = useState([])
   const [playerHp, setPlayerHp] = useState(player.currentHp ?? player.pv)
   const [monsterHp, setMonsterHp] = useState(null)
@@ -17,15 +18,28 @@ function Combat({ player, monsterId, onResult }) {
   }
 
   useEffect(() => {
-    fetchMonster()
+    fetchData()
     // eslint-disable-next-line
   }, [])
 
-  async function fetchMonster() {
-    const { data } = await supabase.from('monsters').select('*').eq('id', monsterId).single()
-    if (data) {
-      setMonster(data)
-      setMonsterHp(data.pv)
+  async function fetchData() {
+    const { data: monsterData } = await supabase
+      .from('monsters')
+      .select('*')
+      .eq('id', monsterId)
+      .single()
+
+    if (monsterData) {
+      setMonster(monsterData)
+      setMonsterHp(monsterData.pv)
+    }
+
+    if (player.weapon_id) {
+      const { data: lines } = await supabase
+        .from('weapon_damage_lines')
+        .select('*')
+        .eq('weapon_id', player.weapon_id)
+      if (lines) setWeaponLines(lines)
     }
   }
 
@@ -37,18 +51,73 @@ function Combat({ player, monsterId, onResult }) {
     // eslint-disable-next-line
   }, [monster])
 
-  function getPlayerDamage() {
-    if (player.class === 'voleur') return Math.round(player.agilite * 1.5)
-    return player.force
+  function getPlayerStats() {
+    return {
+      force: (player.force || 10) + (player.points_force || 0),
+      agilite: (player.agilite || 10) + (player.points_agilite || 0),
+      intelligence: (player.intelligence || 10) + (player.points_intelligence || 0),
+      chance: (player.chance || 10) + (player.points_chance || 0),
+    }
+  }
+
+  function calcPlayerDamage() {
+    const stats = getPlayerStats()
+    const damageBonus = player.damage_bonus || 0
+    const damageMultiplier = player.damage_multiplier || 1.0
+
+    // Si le joueur a une arme avec des lignes de dégâts
+    if (weaponLines.length > 0) {
+      let totalDamage = 0
+      weaponLines.forEach(line => {
+        const roll = Math.floor(Math.random() * (line.max_damage - line.min_damage + 1)) + line.min_damage
+        const statValue = stats[line.stat] || 10
+        const lineDamage = (roll + damageBonus) * 0.01 * statValue * damageMultiplier
+        totalDamage += Math.round(lineDamage)
+      })
+      return Math.max(1, totalDamage)
+    }
+
+    // Sans arme : dégâts de base selon la classe
+    // Sans arme : dégâts de base selon la classe
+    if (player.class === 'voleur') {
+      const roll = Math.floor(Math.random() * 4) + 3 // 3-6 dégâts de base
+      return Math.max(1, Math.round(roll + stats.agilite * 1.5 * 0.1 * damageMultiplier))
+    }
+    const roll = Math.floor(Math.random() * 4) + 3
+    return Math.max(1, Math.round(roll + stats.force * 0.1 * damageMultiplier))
+  }
+
+  function applyResistances(rawDamage, stat, monster) {
+    const resFixe = monster[`res_fixe_${stat}`] || 0
+    const resPct = monster[`res_pct_${stat}`] || 0
+    const resGlobale = monster.res_globale || 0
+
+    const afterFixe = rawDamage - resFixe
+    const afterPct = afterFixe * (1 - resPct / 100)
+    const afterGlobal = afterPct * (1 - resGlobale / 100)
+
+    return Math.max(0, Math.round(afterGlobal))
+  }
+
+  function calcMonsterDamage(monster) {
+    const roll = Math.floor(Math.random() * 4) + 1
+    const rawDamage = Math.round(roll + monster.force * 0.1 * (monster.damage_multiplier || 1.0))
+
+    // Résistances du joueur
+    const resFixe = player.res_fixe_force || 0
+    const resPct = player.res_pct_force || 0
+    const resGlobale = player.res_globale || 0
+
+    const afterFixe = rawDamage - resFixe
+    const afterPct = afterFixe * (1 - resPct / 100)
+    const afterGlobal = afterPct * (1 - resGlobale / 100)
+
+    if (player.class === 'guerrier') return Math.max(0, Math.round(afterGlobal * 0.8))
+    return Math.max(0, Math.round(afterGlobal))
   }
 
   function getPlayerInitiative() {
-    return player.agilite
-  }
-
-  function getDamageToPlayer(rawDamage) {
-    if (player.class === 'guerrier') return Math.round(rawDamage * 0.8)
-    return rawDamage
+    return (player.agilite || 10) + (player.points_agilite || 0)
   }
 
   async function runCombat() {
@@ -64,17 +133,17 @@ function Combat({ player, monsterId, onResult }) {
       await new Promise(resolve => setTimeout(resolve, speedRef.current))
 
       if (turn === 'player') {
-        const dmg = Math.max(1, getPlayerDamage() - monster.resistance)
-        // eslint-disable-next-line no-loop-func
+        const rawDmg = calcPlayerDamage()
+        // Pour les dégâts sans arme, on utilise 'force' comme élément par défaut
+        const stat = (weaponLines.length > 0 && weaponLines[0].stat) || (player.class === 'voleur' ? 'agilite' : 'force')
+        const dmg = applyResistances(rawDmg, stat, monster)
         mHp = Math.max(0, mHp - dmg)
         setMonsterHp(mHp)
         // eslint-disable-next-line no-loop-func
         setLog(prev => [...prev, `⚔️ ${player.username} inflige ${dmg} dégâts à ${monster.name} (${mHp} PV restants)`])
         turn = 'monster'
       } else {
-        const rawDmg = Math.max(1, monster.force - (player.resistance || 0))
-        const dmg = getDamageToPlayer(rawDmg)
-        // eslint-disable-next-line no-loop-func
+        const dmg = calcMonsterDamage(monster)
         pHp = Math.max(0, pHp - dmg)
         setPlayerHp(pHp)
         // eslint-disable-next-line no-loop-func
