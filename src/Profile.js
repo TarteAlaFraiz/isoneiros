@@ -82,10 +82,9 @@ function Profile({ player, onBack, onOpenStats, onSave }) {
             ✨ Distribuer {player.points_disponibles} point{player.points_disponibles > 1 ? 's' : ''}
           </button>
         )}
-        <button style={styles.resetBtn} onClick={handleResetStats} disabled={resetDone}>
+        <button style={styles.resetBtn} onClick={handleResetStats}>
           🔄 Réinitialiser les points de stats
         </button>
-        {resetDone && <p style={styles.successMsg}>✅ Points réinitialisés ! Va dans "Distribuer" pour les redistribuer.</p>}
         <p style={styles.hint}>Remet tous tes points manuels à zéro et te les rend à redistribuer.</p>
       </div>
     </div>
