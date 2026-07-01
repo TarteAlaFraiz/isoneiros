@@ -1,15 +1,18 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { supabase } from './supabase'
 
-function Profile({ player, onBack }) {
-  const xpForNextLevel = player.level * 100
+function Profile({ player, onBack, onOpenStats, onSave }) {
+  const [resetDone, setResetDone] = useState(false)
+
+  const xpForNextLevel = Math.floor(100 * Math.pow(player.level, 1.5))
   const xpPercent = Math.min((player.xp || 0) / xpForNextLevel * 100, 100)
-
+  const pvBase = 100 + ((player.level - 1) * 5)
   const stats = [
-    { label: 'PV', value: player.pv || 100, icon: '❤️' },
-    { label: 'Force', value: player.force || 10, icon: '💪' },
-    { label: 'Agilité', value: player.agilite || 10, icon: '🌀' },
-    { label: 'Intelligence', value: player.intelligence || 10, icon: '🧠' },
-    { label: 'Chance', value: player.chance || 10, icon: '🍀' },
+    { label: 'PV', value: pvBase + (player.points_pv || 0) * 10, icon: '❤️' },
+    { label: 'Force', value: (player.force || 10) + (player.points_force || 0), icon: '💪' },
+    { label: 'Agilité', value: (player.agilite || 10) + (player.points_agilite || 0), icon: '🌀' },
+    { label: 'Intelligence', value: (player.intelligence || 10) + (player.points_intelligence || 0), icon: '🧠' },
+    { label: 'Chance', value: (player.chance || 10) + (player.points_chance || 0), icon: '🍀' },
   ]
 
   const classColors = {
@@ -17,8 +20,30 @@ function Profile({ player, onBack }) {
     voleur: '#8e44ad',
     alchimiste: '#27ae60',
   }
-
   const classColor = classColors[player.class] || '#c9a84c'
+
+  async function handleResetStats() {
+    const totalSpent = (player.points_force || 0) +
+      (player.points_agilite || 0) +
+      (player.points_intelligence || 0) +
+      (player.points_chance || 0) +
+      (player.points_pv || 0)
+
+    await supabase
+      .from('players')
+      .update({
+        points_force: 0,
+        points_agilite: 0,
+        points_intelligence: 0,
+        points_chance: 0,
+        points_pv: 0,
+        points_disponibles: (player.points_disponibles || 0) + totalSpent,
+      })
+      .eq('user_id', player.user_id)
+
+    if (onSave) await onSave()
+    if (totalSpent > 0) onOpenStats()
+  }
 
   return (
     <div style={styles.page}>
@@ -30,7 +55,6 @@ function Profile({ player, onBack }) {
         </div>
         <h1 style={styles.name}>{player.username}</h1>
         <p style={styles.level}>Niveau {player.level}</p>
-
         <div style={styles.xpBarBg}>
           <div style={{ ...styles.xpBarFill, width: `${xpPercent}%` }} />
         </div>
@@ -52,6 +76,19 @@ function Profile({ player, onBack }) {
           </div>
         ))}
       </div>
+
+      <div style={styles.actionsSection}>
+        {(player.points_disponibles || 0) > 0 && (
+          <button style={styles.distributeBtn} onClick={onOpenStats}>
+            ✨ Distribuer {player.points_disponibles} point{player.points_disponibles > 1 ? 's' : ''}
+          </button>
+        )}
+        <button style={styles.resetBtn} onClick={handleResetStats} disabled={resetDone}>
+          🔄 Réinitialiser les points de stats
+        </button>
+        {resetDone && <p style={styles.successMsg}>✅ Points réinitialisés ! Va dans "Distribuer" pour les redistribuer.</p>}
+        <p style={styles.hint}>Remet tous tes points manuels à zéro et te les rend à redistribuer.</p>
+      </div>
     </div>
   )
 }
@@ -70,11 +107,16 @@ const styles = {
   isosIcon: { fontSize: '1.5rem' },
   isosValue: { color: '#c9a84c', fontFamily: 'Georgia, serif', fontSize: '1.5rem', fontWeight: 'bold' },
   isosLabel: { color: '#888', fontSize: '0.9rem' },
-  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' },
+  statsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' },
   statCard: { background: '#111122', border: '1px solid #2a2a4a', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' },
   statIcon: { fontSize: '1.5rem' },
   statValue: { color: '#c9a84c', fontFamily: 'Georgia, serif', fontSize: '1.4rem' },
   statLabel: { color: '#888', fontSize: '0.75rem' },
+  actionsSection: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' },
+  distributeBtn: { background: '#1a1a2e', border: '1px solid #c9a84c', color: '#c9a84c', borderRadius: '10px', padding: '12px 24px', fontSize: '1rem', cursor: 'pointer' },
+  resetBtn: { background: '#111122', border: '1px solid #2a2a4a', color: '#888', borderRadius: '10px', padding: '12px 24px', fontSize: '0.9rem', cursor: 'pointer' },
+  successMsg: { color: '#4a9a5a', fontSize: '0.85rem' },
+  hint: { color: '#444', fontSize: '0.75rem', fontStyle: 'italic' },
 }
 
 export default Profile

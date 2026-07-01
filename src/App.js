@@ -5,6 +5,7 @@ import Settings from './Settings'
 import Profile from './Profile'
 import Dungeon from './Dungeon'
 import Inventory from './Inventory'
+import StatDistribution from './StatDistribution'
 
 const menuItems = [
   { id: 'dungeon',     label: 'Donjon',      icon: '⚔️' },
@@ -55,14 +56,29 @@ function App() {
   )
 
   if (session && player === null) return (
-    <CharacterCreation session={session} onCreated={fetchPlayer} />
+    <CharacterCreation session={session} onCreated={fetchPlayer} onBack={() => supabase.auth.signOut()} />
   )
+
   if (showSettings) return (
-  <Settings onBack={() => setShowSettings(false)} />
+    <Settings player={player} onBack={() => setShowSettings(false)} />
   )
+
   if (activeTab === 'dungeon') return (
-  <Dungeon player={player} onBack={() => setActiveTab(null)} />
+    <Dungeon player={player} onBack={() => setActiveTab(null)} />
+  )
+
+  if (activeTab === 'profile') return (
+  <Profile key={JSON.stringify(player)} player={player} onBack={() => setActiveTab(null)} onOpenStats={() => setActiveTab('stats')} onSave={fetchPlayer} />
 )
+
+  if (activeTab === 'inventory') return (
+    <Inventory player={player} onBack={() => setActiveTab(null)} />
+  )
+
+  if (activeTab === 'stats') return (
+    <StatDistribution player={player} onBack={() => setActiveTab('profile')} onSave={fetchPlayer} />
+  )
+
   if (activeTab) return (
     <div style={styles.app}>
       <div style={styles.topBar}>
@@ -71,9 +87,7 @@ function App() {
         <span />
       </div>
       <div style={styles.content}>
-        {activeTab === 'profile' && <Profile player={player} onBack={() => setActiveTab(null)} />}
-        {activeTab === 'inventory' && <Inventory player={player} onBack={() => setActiveTab(null)} />}
-        {activeTab !== 'profile' && activeTab !== 'inventory' && <p style={styles.comingSoon}>Bientôt disponible...</p>}
+        <p style={styles.comingSoon}>Bientôt disponible...</p>
       </div>
     </div>
   )

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { supabase } from './supabase'
 import Combat from './Combat'
 import { gameConfig } from './gameConfig'
+import LevelUp from './LevelUp'
 
 const ROW_SIZES = [2, 3, 4, 3, 4, 3, 2]
 const roomWeights = [
@@ -63,6 +64,7 @@ function Dungeon({ player, onBack }) {
   const [screen, setScreen] = useState('map')
   const [currentHp, setCurrentHp] = useState(player.pv)
   const [lootPanelOpen, setLootPanelOpen] = useState(false)
+  const [levelUpData, setLevelUpData] = useState(null)
 
   const mapRef = useRef(null)
   const roomRefs = useRef({})
@@ -149,6 +151,8 @@ function Dungeon({ player, onBack }) {
 
     if (result.victory) {
       await handleCombatVictory(result.monster)
+      await addXpToPlayer(result.monster.xp_reward || 0)
+
       const targetRow = pendingRoomTarget.rowIndex
       const targetRoomIdx = pendingRoomTarget.roomIndex
       const isBoss = floorMap[targetRow][targetRoomIdx]?.type === 'boss'
@@ -192,6 +196,38 @@ function Dungeon({ player, onBack }) {
     }
 
     setRunLoot(newLoot)
+  }
+
+  async function addXpToPlayer(xpGained) {
+    const { data: currentPlayer } = await supabase
+      .from('players')
+      .select('xp, level, pv')
+      .eq('user_id', player.user_id)
+      .single()
+
+    if (!currentPlayer) return
+
+    const newXp = (currentPlayer.xp || 0) + xpGained
+    const xpRequired = Math.floor(100 * Math.pow(currentPlayer.level, 1.5))
+
+    if (newXp >= xpRequired) {
+      const newLevel = currentPlayer.level + 1
+      const newPv = currentPlayer.pv + 5
+      const remainingXp = newXp - xpRequired
+
+      await supabase
+        .from('players')
+        .update({ xp: remainingXp, level: newLevel, pv: newPv })
+        .eq('user_id', player.user_id)
+
+      setLevelUpData({ level: newLevel, pointsToSpend: 3 })
+      setScreen('levelUp')
+    } else {
+      await supabase
+        .from('players')
+        .update({ xp: newXp })
+        .eq('user_id', player.user_id)
+    }
   }
 
   async function commitLootToInventory(lootObj) {
@@ -250,6 +286,35 @@ function Dungeon({ player, onBack }) {
         player={{ ...player, currentHp }}
         monsterId={currentMonsterId}
         onResult={handleCombatResult}
+      />
+    )
+  }
+
+  if (screen === 'levelUp' && levelUpData) {
+    return (
+      <LevelUp
+        player={player}
+        levelUpData={levelUpData}
+        onComplete={async (statChoices) => {
+          const totalSpent = Object.values(statChoices).reduce((sum, v) => sum + v, 0) -
+            Object.values({
+              points_pv: player.points_pv || 0,
+              points_force: player.points_force || 0,
+              points_agilite: player.points_agilite || 0,
+              points_intelligence: player.points_intelligence || 0,
+              points_chance: player.points_chance || 0,
+            }).reduce((sum, v) => sum + v, 0)
+
+          await supabase
+            .from('players')
+            .update({
+              ...statChoices,
+              points_disponibles: Math.max(0, (player.points_disponibles || 0) - totalSpent)
+            })
+            .eq('user_id', player.user_id)
+          setScreen('map')
+          setLevelUpData(null)
+        }}
       />
     )
   }
