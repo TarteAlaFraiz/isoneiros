@@ -1,8 +1,7 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { supabase } from './supabase'
 
 function Profile({ player, onBack, onOpenStats, onSave }) {
-  const [resetDone, setResetDone] = useState(false)
 
   const xpForNextLevel = Math.floor(100 * Math.pow(player.level, 1.5))
   const xpPercent = Math.min((player.xp || 0) / xpForNextLevel * 100, 100)
