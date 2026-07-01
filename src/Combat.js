@@ -63,7 +63,7 @@ function Combat({ player, monsterId, onResult }) {
   function calcPlayerDamage() {
     const stats = getPlayerStats()
     const damageBonus = player.damage_bonus || 0
-    const damageMultiplier = player.damage_multiplier || 1.0
+    const damageMultiplier = 1 + (player.damage_multiplier || 0) / 100
 
     // Si le joueur a une arme avec des lignes de dégâts
     if (weaponLines.length > 0) {
@@ -101,7 +101,8 @@ function Combat({ player, monsterId, onResult }) {
 
   function calcMonsterDamage(monster) {
     const roll = Math.floor(Math.random() * 4) + 1
-    const rawDamage = Math.round(roll + monster.force * 0.1 * (monster.damage_multiplier || 1.0))
+    const monsterMultiplier = 1 + (monster.damage_multiplier || 0) / 100
+    const rawDamage = Math.round((roll + monster.force * 0.1) * monsterMultiplier)
 
     // Résistances du joueur
     const resFixe = player.res_fixe_force || 0

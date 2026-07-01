@@ -6,6 +6,7 @@ import Profile from './Profile'
 import Dungeon from './Dungeon'
 import Inventory from './Inventory'
 import StatDistribution from './StatDistribution'
+import Equipment from './Equipment'
 
 const menuItems = [
   { id: 'dungeon',     label: 'Donjon',      icon: '⚔️' },
@@ -68,8 +69,8 @@ function App() {
   )
 
   if (activeTab === 'profile') return (
-  <Profile key={JSON.stringify(player)} player={player} onBack={() => setActiveTab(null)} onOpenStats={() => setActiveTab('stats')} onSave={fetchPlayer} />
-)
+  <Profile player={player} onBack={() => setActiveTab(null)} onOpenStats={() => setActiveTab('stats')} onSave={fetchPlayer} onOpenEquipment={() => setActiveTab('equipment')} />
+  )
 
   if (activeTab === 'inventory') return (
     <Inventory player={player} onBack={() => setActiveTab(null)} />
@@ -77,6 +78,10 @@ function App() {
 
   if (activeTab === 'stats') return (
     <StatDistribution player={player} onBack={() => setActiveTab('profile')} onSave={fetchPlayer} />
+  )
+
+  if (activeTab === 'equipment') return (
+  <Equipment player={player} onBack={() => setActiveTab('profile')} onSave={fetchPlayer} />
   )
 
   if (activeTab) return (
@@ -90,6 +95,7 @@ function App() {
         <p style={styles.comingSoon}>Bientôt disponible...</p>
       </div>
     </div>
+    
   )
 
   return (

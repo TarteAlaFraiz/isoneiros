@@ -1,7 +1,7 @@
 import React from 'react'
 import { supabase } from './supabase'
 
-function Profile({ player, onBack, onOpenStats, onSave }) {
+function Profile({ player, onBack, onOpenStats, onSave, onOpenEquipment }) {
 
   const xpForNextLevel = Math.floor(100 * Math.pow(player.level, 1.5))
   const xpPercent = Math.min((player.xp || 0) / xpForNextLevel * 100, 100)
@@ -66,6 +66,10 @@ function Profile({ player, onBack, onOpenStats, onSave }) {
         <span style={styles.isosLabel}>Isos</span>
       </div>
 
+      <button style={styles.equipBtn} onClick={() => onOpenEquipment()}>
+        ⚔️ Gérer l'équipement
+      </button>
+
       <div style={styles.statsGrid}>
         {stats.map(stat => (
           <div key={stat.label} style={styles.statCard}>
@@ -115,6 +119,7 @@ const styles = {
   resetBtn: { background: '#111122', border: '1px solid #2a2a4a', color: '#888', borderRadius: '10px', padding: '12px 24px', fontSize: '0.9rem', cursor: 'pointer' },
   successMsg: { color: '#4a9a5a', fontSize: '0.85rem' },
   hint: { color: '#444', fontSize: '0.75rem', fontStyle: 'italic' },
+  equipBtn: { background: '#111122', border: '1px solid #2a2a4a', borderRadius: '10px', color: '#c9a84c', padding: '12px 24px', fontSize: '0.95rem', cursor: 'pointer', width: '100%', marginBottom: '12px' },
 }
 
 export default Profile
