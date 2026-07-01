@@ -4,6 +4,7 @@ import CharacterCreation from './CharacterCreation'
 import Settings from './Settings'
 import Profile from './Profile'
 import Dungeon from './Dungeon'
+import Inventory from './Inventory'
 
 const menuItems = [
   { id: 'dungeon',     label: 'Donjon',      icon: '⚔️' },
@@ -70,10 +71,9 @@ function App() {
         <span />
       </div>
       <div style={styles.content}>
-        {activeTab === 'profile' ? 
-  <Profile player={player} onBack={() => setActiveTab(null)} /> : 
-  <p style={styles.comingSoon}>Bientôt disponible...</p>
-}
+        {activeTab === 'profile' && <Profile player={player} onBack={() => setActiveTab(null)} />}
+        {activeTab === 'inventory' && <Inventory player={player} onBack={() => setActiveTab(null)} />}
+        {activeTab !== 'profile' && activeTab !== 'inventory' && <p style={styles.comingSoon}>Bientôt disponible...</p>}
       </div>
     </div>
   )
